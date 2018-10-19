@@ -40,7 +40,6 @@ def showLogin():
 @app.route('/gconnect', methods=['POST'])
 def gconnect():
     # Validate state token
-    
     if request.args.get('state') != login_session['state']:
         print (request.args.get('state'))
         print (login_session['state'])
