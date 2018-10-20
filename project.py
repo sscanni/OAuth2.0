@@ -1,3 +1,4 @@
+#!/usr/bin/env python2
 from flask import Flask, render_template, request, redirect,jsonify, url_for, flash
 app = Flask(__name__)
 
@@ -35,7 +36,7 @@ def showLogin():
     state = ''.join(random.choice(string.ascii_uppercase + string.
         digits) for x in xrange(32))
     login_session['state'] = state
-    return render_template('login.html')
+    return render_template('login.html', STATE=state)
 
 @app.route('/gconnect', methods=['POST'])
 def gconnect():
@@ -45,12 +46,13 @@ def gconnect():
         print (login_session['state'])
         response = make_response(json.dumps('Invalid state parameter.'), 401)
         response.headers['Content-Type'] = 'application/json'
-        print("response=", response)
         return response
     # Obtain authorization code
     code = request.data
+    print (code)
 
     try:
+        print ("try")
         # Upgrade the authorization code into a credentials object
         oauth_flow = flow_from_clientsecrets('client_secrets.json', scope='')
         oauth_flow.redirect_uri = 'postmessage'
@@ -68,6 +70,7 @@ def gconnect():
     h = httplib2.Http()
     result = json.loads(h.request(url, 'GET')[1])
     # If there was an error in the access token info, abort.
+    print (result)
     if result.get('error') is not None:
         response = make_response(json.dumps(result.get('error')), 500)
         response.headers['Content-Type'] = 'application/json'
@@ -123,7 +126,35 @@ def gconnect():
     print ("done!")
     return output
 
-
+@app.route('/gdisconnect')
+def gdisconnect():
+    access_token = login_session.get('access_token')
+    if access_token is None:
+        print ('Access Token is None')
+        response = make_response(json.dumps('Current user not connected.'), 401)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+    print ('In gdisconnect access token is %s', access_token)
+    print ('User name is: ')
+    print (login_session['username'])
+    url = 'https://accounts.google.com/o/oauth2/revoke?token=%s' % login_session['access_token']
+    h = httplib2.Http()
+    result = h.request(url, 'GET')[0]
+    print ('result is ')
+    print (result)
+    if result['status'] == '200':
+        del login_session['access_token']
+        del login_session['gplus_id']
+        del login_session['username']
+        del login_session['email']
+        del login_session['picture']
+        response = make_response(json.dumps('Successfully disconnected.'), 200)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+    else:
+        response = make_response(json.dumps('Failed to revoke token for given user.', 400))
+        response.headers['Content-Type'] = 'application/json'
+        return response
 
 #JSON APIs to view Restaurant Information
 @app.route('/restaurant/<int:restaurant_id>/menu/JSON')
